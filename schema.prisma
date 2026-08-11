@@ -1,0 +1,101 @@
+// Guidely data model
+// Run `npm run prisma:migrate` after setting DATABASE_URL to create these tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  plan          String    @default("free") // "free" | "premium"
+  notifEnabled  Boolean   @default(true)
+  notifTime     String    @default("09:00") // HH:mm, local reminder time
+  createdAt     DateTime  @default(now())
+
+  goals         Goal[]
+  messages      ChatMessage[]
+  streak        Streak?
+  subscription  Subscription?
+  pushTokens    PushToken[]
+}
+
+model Goal {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  category       String
+  experience     String
+  timelineWeeks  Int
+  status         String    @default("active") // "active" | "completed" | "abandoned"
+  createdAt      DateTime  @default(now())
+
+  tasks          Task[]
+
+  @@index([userId, status])
+}
+
+model Task {
+  id            String    @id @default(uuid())
+  goalId        String
+  goal          Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  phase         String
+  phaseIndex    Int
+  week          Int
+  order         Int
+  title         String
+  done          Boolean   @default(false)
+  completedAt   DateTime?
+
+  @@index([goalId])
+}
+
+model ChatMessage {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  from       String    // "user" | "coach"
+  text       String
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Streak {
+  id              String     @id @default(uuid())
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak   Int        @default(0)
+  longestStreak   Int        @default(0)
+  lastActiveDate  DateTime?
+}
+
+model Subscription {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  status                String    @default("inactive") // "inactive" | "active" | "canceled" | "past_due"
+  plan                  String    @default("free")      // "free" | "premium_monthly" | "premium_yearly"
+  currentPeriodEnd      DateTime?
+}
+
+model PushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String
+  platform   String   // "ios" | "android" | "web"
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, token])
+}
